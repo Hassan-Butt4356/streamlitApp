@@ -40,19 +40,6 @@ if page!='timedetails':
     st.sidebar.header("Filters")
     search_query=st.sidebar.text_input(label='Search', placeholder='Search')
 
-# final_usage = st.sidebar.selectbox(label='Final Usage', options=['All', 'Use', 'Remove'])
-
-    # unique_dates = df1['Date'].dt.date.unique()
-    # selected_date = st.sidebar.date_input(
-    #     "Select a date",
-    #     value=None,
-    #     min_value=min(unique_dates),
-    #     max_value=max(unique_dates)
-    # )
-# else:
-#     final_usage = 'All'  # Default value when sidebar is not shown
-#     search_query=''
-
 
 header_col1, header_col2, header_col3 = st.columns([2, 2,1]) 
 
