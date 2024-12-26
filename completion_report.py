@@ -96,6 +96,7 @@ def filter_dataframe(df, query):
 
 def time_details(details_df):
 
+    print()
 
     st.dataframe(details_df[['OPPO_TIME[CODE]', 'TIME_ON[Code]', 'TIME_ON', 'TIME_PERIOD[Code]',
                               'TIME_PERIOD', 'START_TIME']], height=670, use_container_width=True)
