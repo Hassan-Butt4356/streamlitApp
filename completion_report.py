@@ -1,16 +1,87 @@
 import streamlit as st
+import snowflake.connector
 import pandas as pd
+from snowflake.connector.pandas_tools import pd_writer,write_pandas
+from decouple import config
 
+# print()
+def create_snowflake_connection():
+    # Replace with your Snowflake credentials
+    conn = snowflake.connector.connect(
+        user=config('user'),  # Snowflake username
+        password=config('password'),  # Snowflake password
+        account=config('account'),  # Snowflake account (e.g., abc12345.us-east-1)
+        warehouse=config('warehouse'),  # Snowflake warehouse name
+        database=config('database'),  # Your Snowflake database name
+        schema=config('schema') , # Default schema (you can change it)
+        role=config('role')  # Your Snowflake database name
+    )
+    return conn
 
-wkday_df=pd.read_excel('data/reviewtool_20241224_VTA_RouteLevelComparison(Wkday & WkEnd)_Latest_01.xlsx',sheet_name='WkDAY Route Comparison')
-wkday_dir_df=pd.read_excel('data/reviewtool_20241224_VTA_RouteLevelComparison(Wkday & WkEnd)_Latest_01.xlsx',sheet_name='WkDAY Route DIR Comparison')
-wkend_df=pd.read_excel('data/reviewtool_20241224_VTA_RouteLevelComparison(Wkday & WkEnd)_Latest_01.xlsx',sheet_name='WkEND Route Comparison')
-wkend_dir_df=pd.read_excel('data/reviewtool_20241224_VTA_RouteLevelComparison(Wkday & WkEnd)_Latest_01.xlsx',sheet_name='WkEND Route DIR Comparison')
+def fetch_dataframes_from_snowflake():
+    """
+    Fetches data from Snowflake tables and returns them as a dictionary of DataFrames.
 
-wkend_time_df=pd.read_excel('data/reviewtool_20241224_VTA_RouteLevelComparison(Wkday & WkEnd)_Latest_01.xlsx',sheet_name='WkEND Time Data')
-wkday_time_df=pd.read_excel('data/reviewtool_20241224_VTA_RouteLevelComparison(Wkday & WkEnd)_Latest_01.xlsx',sheet_name='WkDAY Time Data')
+    Returns:
+        dict: A dictionary where keys are DataFrame names and values are DataFrames.
+    """
+    # Snowflake connection details
+    conn = create_snowflake_connection()
+    cur = conn.cursor()
 
-detail_df=pd.read_excel('data/details_vta_CA_od_excel.xlsx',sheet_name='TOD')
+    # Table-to-DataFrame mapping
+    table_to_df_mapping = {
+        'wkday_comparison': 'wkday_df',
+        'wkday_dir_comparison': 'wkday_dir_df',
+        'wkend_comparison': 'wkend_df',
+        'wkend_dir_comparison': 'wkend_dir_df',
+        'wkend_time_data': 'wkend_time_df',
+        'wkday_time_data': 'wkday_time_df',
+        'TOD': 'detail_df'
+    }
+
+    # Initialize an empty dictionary to hold DataFrames
+    dataframes = {}
+
+    try:
+        # Loop through each table, fetch its data, and store it in the corresponding DataFrame
+        for table_name, df_name in table_to_df_mapping.items():
+            # Query to fetch data
+            query = f"SELECT * FROM {table_name}"
+            
+            # Execute query and fetch data
+            cur.execute(query)
+            data = cur.fetchall()
+            
+            # Get column names from the cursor description
+            columns = [desc[0] for desc in cur.description]
+            
+            # Convert data to DataFrame
+            df = pd.DataFrame(data, columns=columns)
+            dataframes[df_name] = df
+            
+            print(f"Data fetched and stored in DataFrame: {df_name}")
+    except Exception as e:
+        print(f"Error fetching data: {e}")
+    finally:
+        # Close cursor and connection
+        cur.close()
+        conn.close()
+
+    return dataframes
+
+# Fetch dataframes from Snowflake
+dataframes = fetch_dataframes_from_snowflake()
+
+# Example: Access DataFrames
+wkday_df = dataframes['wkday_df']
+wkday_dir_df = dataframes['wkday_dir_df']
+wkend_df = dataframes['wkend_df']
+wkend_dir_df = dataframes['wkend_dir_df']
+wkend_time_df = dataframes['wkend_time_df']
+wkday_time_df = dataframes['wkday_time_df']
+detail_df = dataframes['detail_df']
+
 
 st.set_page_config(page_title="DataFrames Example", layout='wide')
 
@@ -82,12 +153,10 @@ def filter_dataframe(df, query):
     return df
 
 def time_details(details_df):
+    # st.dataframe(details_df[['OPPO_TIME[CODE]', 'TIME_ON[Code]', 'TIME_ON', 'TIME_PERIOD[Code]',
+    #                           'TIME_PERIOD', 'START_TIME']], height=670, use_container_width=True)
 
-    print()
-
-    st.dataframe(details_df[['OPPO_TIME[CODE]', 'TIME_ON[Code]', 'TIME_ON', 'TIME_PERIOD[Code]',
-                              'TIME_PERIOD', 'START_TIME']], height=670, use_container_width=True)
-
+    st.dataframe(details_df, height=670, use_container_width=True)
     if st.button("GO TO HOME"):
         st.experimental_set_query_params(page="main")
         st.experimental_rerun()
@@ -123,7 +192,7 @@ def weekday_page():
        '(2) Goal', '(3) Goal', '(4) Goal', '(5) Goal', '(0) Collect',
        '(1) Collect', '(2) Collect', '(3) Collect', '(4) Collect',
        '(5) Collect', '(0) Remain', '(1) Remain', '(2) Remain',
-       '(3) Remain', '(4) Remain', '(5) Remain']], wkday_time_df[['Display_Text','Original Text','Time Range',0, 1, 2, 3, 4, 5]], wkday_df[['ROUTE_SURVEYEDCode', 'Route Level Goal', '# of Surveys', 'Remaining']])  # Load weekday data
+       '(3) Remain', '(4) Remain', '(5) Remain']], wkday_time_df[['Display_Text','Original Text','Time Range','0', '1', '2', '3', '4', '5']], wkday_df[['ROUTE_SURVEYEDCode', 'Route Level Goal', '# of Surveys', 'Remaining']])  # Load weekday data
     # csv = create_csv(wkday_df)
     # download_csv(csv)
 
@@ -138,7 +207,7 @@ def weekend_page():
        '(2) Goal', '(3) Goal', '(4) Goal', '(5) Goal', '(0) Collect',
        '(1) Collect', '(2) Collect', '(3) Collect', '(4) Collect',
        '(5) Collect', '(0) Remain', '(1) Remain', '(2) Remain',
-       '(3) Remain', '(4) Remain', '(5) Remain']], wkend_time_df[['Display_Text','Original Text','Time Range',0, 1, 2, 3, 4, 5]], wkend_df[['ROUTE_SURVEYEDCode', 'Route Level Goal', '# of Surveys', 'Remaining']])  # Load weekend data
+       '(3) Remain', '(4) Remain', '(5) Remain']], wkend_time_df[['Display_Text','Original Text','Time Range','0', '1','2', '3', '4', '5']], wkend_df[['ROUTE_SURVEYEDCode', 'Route Level Goal', '# of Surveys', 'Remaining']])  # Load weekend data
     # csv = create_csv(wkend_df)
     # download_csv(csv)
 
@@ -158,4 +227,4 @@ else:
        '(2) Goal', '(3) Goal', '(4) Goal', '(5) Goal', '(0) Collect',
        '(1) Collect', '(2) Collect', '(3) Collect', '(4) Collect',
        '(5) Collect', '(0) Remain', '(1) Remain', '(2) Remain',
-       '(3) Remain', '(4) Remain', '(5) Remain']], wkday_time_df[['Display_Text','Original Text','Time Range',0, 1, 2, 3, 4, 5]], wkday_df[['ROUTE_SURVEYEDCode', 'Route Level Goal', '# of Surveys', 'Remaining']])  # Default to original data for the main page
+       '(3) Remain', '(4) Remain', '(5) Remain']], wkday_time_df[['Display_Text','Original Text','Time Range','0', '1', '2', '3', '4', '5']], wkday_df[['ROUTE_SURVEYEDCode', 'Route Level Goal', '# of Surveys', 'Remaining']])  # Default to original data for the main page
