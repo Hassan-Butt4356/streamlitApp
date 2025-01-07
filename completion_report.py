@@ -18,6 +18,79 @@ def create_snowflake_connection():
     )
     return conn
 
+
+# def style_dataframe(df):
+#     """
+#     Applies conditional formatting to a dataframe.
+#     Colors cells based on their values:
+#     - Green for values >= -10000 and < 1
+#     - Yellow for values >= 1 and < 6
+#     - Pink for values >= 6 and < 35
+#     - Red for values >= 35 and < 10000
+#     """
+#     numeric_columns = df.select_dtypes(include=['int64', 'float64']).columns
+#     def highlight_cell(val):
+#         if -10000 <= val < 1:
+#             return "background-color: green; color: white;"
+#         elif 1 <= val < 6:
+#             return "background-color: yellow; color: black;"
+#         elif 6 <= val < 35:
+#             return "background-color: pink; color: black;"
+#         elif 35 <= val < 10000:
+#             return "background-color: red; color: white;"
+#         return ""
+    
+#     def style_numeric_columns(df, numeric_columns):
+#         """
+#         Style numeric columns based on their values.
+#         """
+#         return df.style.applymap(
+#             highlight_cell, subset=numeric_columns
+#         )
+
+#     styled_df = style_numeric_columns(df, numeric_columns)
+#     # Apply the style function to all cells in the dataframe
+#     return styled_df
+
+def style_dataframe(df, column_name_patterns):
+    """
+    Applies conditional formatting to a dataframe.
+    Colors cells in the specified columns based on their values:
+    - Green for values >= -10000 and < 1
+    - Yellow for values >= 1 and < 6
+    - Pink for values >= 6 and < 35
+    - Red for values >= 35 and < 10000
+
+    Parameters:
+    - df: pandas DataFrame to style.
+    - column_name_patterns: list of strings or substrings to filter column names (e.g., ["Remain"]).
+    """
+    # Filter columns based on the given patterns
+    target_columns = [col for col in df.columns if any(pattern in col for pattern in column_name_patterns)]
+    
+    def highlight_cell(val):
+        if -10000 <= val < 1:
+            return "background-color: #BCE29E; color: black;"
+
+        elif 1 <= val < 6:
+            return "background-color: #E5EBB2; color: black;"
+
+        elif 6 <= val < 35:
+            return "background-color: #F8C4B4; color: black;"
+
+        elif 35 <= val < 10000:
+            return "background-color: #FF8787; color: black;"
+
+        return ""
+
+    # Apply styling only to the target columns
+    return df.style.applymap(
+        highlight_cell, subset=target_columns
+    )
+
+column_name_patterns=['(0) Remain', '(1) Remain', '(2) Remain', 
+       '(3) Remain', '(4) Remain', '(5) Remain' ,'Remaining']
+
 def fetch_dataframes_from_snowflake():
     """
     Fetches data from Snowflake tables and returns them as a dictionary of DataFrames.
@@ -173,7 +246,7 @@ def main_page(data1, data2, data3):
         else:
             st.subheader("Route Direction Level Comparison")
         filtered_df1 = filter_dataframe(data1, search_query)
-        st.dataframe(filtered_df1, height=690)
+        st.dataframe(style_dataframe(filtered_df1,column_name_patterns), height=690)
 
     # Display buttons and dataframes in the second column (col2)
     with col2:
@@ -183,7 +256,7 @@ def main_page(data1, data2, data3):
 
         st.subheader("Route Level Comparison")
         filtered_df3 = filter_dataframe(data3, search_query)
-        st.dataframe(filtered_df3, height=300,use_container_width=True)
+        st.dataframe(style_dataframe(filtered_df3,column_name_patterns), height=300,use_container_width=True)
 
 
 def weekday_page():
