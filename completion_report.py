@@ -261,6 +261,77 @@ def time_details(details_df):
 
 
 
+def render_aggrid(dataframe, height, pinned_column):
+    """
+    Render an AgGrid with the specified dataframe, height, and pinned column.
+    
+    Args:
+        dataframe (pd.DataFrame): The dataframe to display in AgGrid.
+        height (int): The height of the grid in pixels.
+        pinned_column (str): The column to pin to the left.
+
+    Returns:
+        None: Displays the AgGrid.
+    """
+    # JavaScript code for cell styling
+    cellStyle = JsCode("""
+        function(params) {
+            const val = params.value;
+
+            if (val >= -10000 && val < 1) {
+                return {'background-color': '#BCE29E', 'color': 'black'};
+            } else if (val >= 1 && val < 6) {
+                return {'background-color': '#E5EBB2', 'color': 'black'};
+            } else if (val >= 6 && val < 35) {
+                return {'background-color': '#F8C4B4', 'color': 'black'};
+            } else if (val >= 35 && val < 10000) {
+                return {'background-color': '#FF8787', 'color': 'black'};
+            }
+            return null;  // Default style
+        }
+    """)
+
+    # Create GridOptionsBuilder
+    gb = GridOptionsBuilder.from_dataframe(dataframe)
+    gb.configure_default_column(editable=False, groupable=False)
+
+    # Pin the specified column
+    if pinned_column in dataframe.columns:
+        gb.configure_column(pinned_column, pinned='left')
+    else:
+        print(f"Column '{pinned_column}' not found in the dataframe")
+
+    # Apply cell style to target columns
+    valid_columns = [col for col in dataframe.columns if any(pattern in col for pattern in column_name_patterns)]
+    for column in valid_columns:
+        gb.configure_column(column, cellStyle=cellStyle)
+
+    # Build grid options
+    gb.configure_grid_options(
+        alwaysShowHorizontalScroll=True,
+        enableRangeSelection=True,
+        pagination=True,
+        paginationPageSize=10000,
+        domLayout='normal'
+    )
+
+    grid_options = gb.build()
+
+    # Render AgGrid
+    AgGrid(
+        dataframe,
+        gridOptions=grid_options,
+        height=height,
+        theme="streamlit",  # Choose theme: 'streamlit', 'light', 'dark', etc.
+        allow_unsafe_jscode=True,  # Required to enable custom JsCode
+        key=f'grid_{pinned_column}',  # Unique key for the grid instance
+        suppressHorizontalScroll=False,
+        fit_columns_on_grid_load=False,
+        reload_data=True,  # Allow horizontal scrolling
+        width='100%',  # Ensure the grid takes full width
+    )
+
+
 def main_page(data1, data2, data3):
     """Main page display with dynamic data"""
     # Create two columns layout
@@ -273,7 +344,7 @@ def main_page(data1, data2, data3):
         else:
             st.subheader("Route Direction Level Comparison")
         filtered_df1 = filter_dataframe(data1, search_query)
-        print(f'{filtered_df1.shape}')
+
         # styled_df=style_dataframe(filtered_df1,column_name_patterns)
         # st.dataframe(style_dataframe(filtered_df1,column_name_patterns), height=690)
         # st.write("### DATA")
@@ -322,41 +393,6 @@ def main_page(data1, data2, data3):
             reload_data=True,  # Allow horizontal scrolling
             width='100%',  # Ensure the grid takes full width
         )
-        # st.dataframe(
-        # AgGrid(
-        #     filtered_df1,
-        #     gridOptions=grid_options,
-        #     height=800,
-        #     theme="streamlit",  # Choose theme: 'streamlit', 'light', 'dark', etc.
-        #     allow_unsafe_jscode=True,  # Required to enable custom JsCode
-        #     key='grid1',
-        #     width='auto',
-        #     fit_columns_on_grid_load=True
-        # ).items,use_container_width=True)
-
-    # Display buttons and dataframes in the second column (col2)
-    with col2:
-
-        st.subheader("Time Range Data")
-        expected_totals = data1[['(0) Goal', '(1) Goal', '(2) Goal', '(3) Goal', '(4) Goal', '(5) Goal']].sum()
-        collected_totals=data2[['0','1', '2', '3', '4', '5']].sum()
-        difference = np.maximum(expected_totals.values - collected_totals.values, 0)
-        result_df = pd.DataFrame({
-            'Time Period':  ['0', '1', '2', '3', '4', '5'],
-            'Collected Totals': collected_totals.values.astype(int),
-            'Expected Totals': expected_totals.values.astype(int),
-            'Remaining': difference.astype(int),
-        })
-        result_df = result_df.reindex(range(len(data2))).fillna(0)
-
-        # Concatenate with data2
-        final_df = pd.concat([data2.reset_index(drop=True), result_df], axis=1)
-        # filtered_df2 = filter_dataframe(style_dataframe(final_df,column_name_patterns), search_query)
-        filtered_df2 = style_dataframe(filter_dataframe(final_df, search_query),column_name_patterns)
-        st.dataframe(filtered_df2, height=250,use_container_width=True)
-        # filtered_df2 = filter_dataframe(data2, search_query)
-        # st.dataframe(filtered_df2, height=300,use_container_width=True)
-
 
         filtered_df3 = filter_dataframe(data3, search_query)
         gb1 = GridOptionsBuilder.from_dataframe(filtered_df3)
@@ -383,10 +419,97 @@ def main_page(data1, data2, data3):
         AgGrid(
             filtered_df3,
             gridOptions=grid_options1,
-            height=250,
+            height=500,
             theme="streamlit",  # Choose theme: 'streamlit', 'light', 'dark', etc.
             allow_unsafe_jscode=True,  # Required to enable custom JsCode
             key='grid2',
+            suppressHorizontalScroll=False,
+            fit_columns_on_grid_load=False,
+            reload_data=True,  # Allow horizontal scrolling
+            width='100%',  # Ensure the grid takes full width
+        )
+
+    # Display buttons and dataframes in the second column (col2)
+    with col2:
+
+        st.subheader("Time Range Data")
+        expected_totals = data1[['(0) Goal', '(1) Goal', '(2) Goal', '(3) Goal', '(4) Goal', '(5) Goal']].sum()
+        collected_totals=data2[['0','1', '2', '3', '4', '5']].sum()
+        difference = np.maximum(expected_totals.values - collected_totals.values, 0)
+        result_df = pd.DataFrame({
+            'Time Period':  ['0', '1', '2', '3', '4', '5'],
+            'Collected Totals': collected_totals.values.astype(int),
+            'Expected Totals': expected_totals.values.astype(int),
+            'Remaining': difference.astype(int),
+        })
+        # this is for matching the length of result dataframe with the data2 dataframe
+        # result_df = result_df.reindex(range(len(data2))).fillna(0)
+
+        # Concatenate with data2
+        # final_df = pd.concat([data2.reset_index(drop=True), result_df], axis=1)
+        filtered_df2 = filter_dataframe(data2, search_query)
+        # final_df = pd.concat([data2.reset_index(drop=True), result_df], axis=1)
+        # filtered_df2 = filter_dataframe(final_df, search_query)
+
+
+        gb2 = GridOptionsBuilder.from_dataframe(filtered_df2)
+        gb2.configure_default_column(editable=False,groupable=False)
+
+        # Pin the specified column
+        gb2.configure_column('Display_Text', pinned='left')
+        # Apply cell style to target columns
+        for column in filtered_df2.columns:
+            if any(pattern in column for pattern in column_name_patterns):
+                gb2.configure_column(column, cellStyle=cellStyle)
+
+        # Build grid options
+        gb2.configure_grid_options(alwaysShowHorizontalScroll=True, enableRangeSelection=True, pagination=True, paginationPageSize=10000, domLayout='normal')
+
+        grid_options = gb2.build()
+        # Render AgGrid
+        AgGrid(
+            filtered_df2,
+            gridOptions=grid_options,
+            height=600,
+            theme="streamlit",  # Choose theme: 'streamlit', 'light', 'dark', etc.
+            allow_unsafe_jscode=True,  # Required to enable custom JsCode
+            key='grid3',
+            suppressHorizontalScroll=False,
+            fit_columns_on_grid_load=False,
+            reload_data=True,  # Allow horizontal scrolling
+            width='100%',  # Ensure the grid takes full width
+        )
+
+        # filtered_df2 = style_dataframe(filter_dataframe(final_df, search_query),column_name_patterns)
+        # st.dataframe(filtered_df2, height=250,use_container_width=True)
+        # filtered_df2 = filter_dataframe(data2, search_query)
+        # st.dataframe(filtered_df2, height=300,use_container_width=True)
+
+
+        filtered_df4 = filter_dataframe(result_df, search_query)
+        gb3 = GridOptionsBuilder.from_dataframe(filtered_df4)
+        gb3.configure_default_column(editable=False,groupable=False)
+        gb3.configure_column('Time Period', pinned='left')
+
+        # Debug column name patterns
+        valid_columns = [col for col in filtered_df4.columns if any(pattern in col for pattern in column_name_patterns)]
+
+        for column in valid_columns:
+            gb3.configure_column(column, cellStyle=cellStyle)
+
+        # Build grid options
+        gb3.configure_grid_options(alwaysShowHorizontalScroll=True, enableRangeSelection=True, pagination=True, paginationPageSize=10000, domLayout='normal')
+
+        grid_options3 = gb3.build()
+        # Render AgGrid
+        st.subheader("Time Period OverAll Data")
+        AgGrid(
+            filtered_df4,
+            gridOptions=grid_options3,
+            height=500,
+            theme="streamlit",  # Choose theme: 'streamlit', 'light', 'dark', etc.
+            allow_unsafe_jscode=True,  # Required to enable custom JsCode
+            key='grid4',
             suppressHorizontalScroll=False,
             fit_columns_on_grid_load=False,
             reload_data=True,  # Allow horizontal scrolling
